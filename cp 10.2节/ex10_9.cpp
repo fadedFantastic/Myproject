@@ -31,8 +31,8 @@ void elimDups(vector<string> &words)
 
 int main()
 {
-	//vector<string> svec{"the","quick", "red", "fox", "jumps", "over","the", "slow", "red", "turtle"};
-	vector<string> svec{ "a", "v", "a", "s", "a", "a", "a" };
+	vector<string> svec{"the","quick", "red", "fox", "jumps", 
+		              "over","the", "slow", "red", "turtle"};
 	elimDups(svec);
 
 	return 0;
