@@ -1,0 +1,221 @@
+using UnityEngine;
+using UnityEditor;
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Xml;
+using System.IO;
+
+public class Point
+{
+    public Vector3 basePosition;
+    public Vector3 tipPosition;
+    public float timeCreated;
+    public float traillength;
+
+    public Point(Vector3 basePos, Vector3 tipPos, float time, float length = 0)
+    {
+        basePosition = basePos;
+        tipPosition = tipPos;
+        timeCreated = time;
+        traillength = length;
+    }
+}
+
+public class AddWeaponTrailWindow : EditorWindow {
+
+    private static AddWeaponTrailWindow m_Instance = null;
+
+    private string m_AnimName;
+    private float m_AnimPlayTime = 0f;
+    private DynamicModel m_DynamicModel;
+    private GameObject m_MainPlayer;
+    private AnimationClip m_Clip;
+
+    private bool m_Sample = false;                                  // 开始采样刀光点   
+    private List<Point> m_Points = new List<Point>();               // 刀光采样点集合
+    
+    private float m_StartTime = 0f;                                 // 刀光开始时间
+    private float m_EndTime = 0f;                                   // 刀光结束时间
+    private float m_Interval = 0f;                                  // 刀光时间间隔
+    private float m_SampleTime = 0f;                                // 刀光采样时间
+
+    GameObject m_Trail;                                             // 刀光
+    private Mesh m_TrailMesh;                                       // 刀光网格
+    private float m_Distance = 0f;
+    private float m_MaxDistance = 2.5f;
+    private float m_LifeTime = 0.05f;
+    
+        public static AddWeaponTrailWindow Instance()
+    {
+        if(m_Instance == null)
+        {
+            m_Instance = AddWeaponTrailWindow.GetWindowWithRect<AddWeaponTrailWindow>(new Rect(300, 300, 300, 200), true, "AddWeaponTrail");
+        }
+        return m_Instance;
+    }
+
+    private void Awake()
+    {
+        m_AnimName = ModelEditorWindow.Instance().AnimationName;
+        m_DynamicModel = ModelEditorWindow.Instance().mMainEditorModel.mDynamciModel;
+        m_MainPlayer = m_DynamicModel.GetModelObj();
+        m_Clip = m_DynamicModel.mAnimationClips[m_AnimName];
+
+        // Load XML
+        string fileName = m_DynamicModel.mResName + "_" + m_AnimName + "_" + "WeaponTrail";
+        LoadSamplePoints(fileName, m_Points);
+    }
+     private void OnGUI()
+    {
+        // 设置刀光效果开始时间、结束时间和间隔时间
+        EditorGUILayout.Space();
+        EditorGUILayout.BeginVertical();
+        m_StartTime =Mathf.Min(Mathf.Max(0f, EditorGUILayout.FloatField("Start Time", m_StartTime)), m_Clip.length);
+        m_EndTime = Mathf.Min(EditorGUILayout.FloatField("End Time", m_EndTime), m_Clip.length);
+        m_Interval = EditorGUILayout.FloatField("Interval Time", m_Interval);
+        EditorGUILayout.EndVertical();
+
+        GUILayout.BeginArea(new Rect(150, 100, 150, 100));
+
+        // 确定
+        if (GUILayout.Button("Ok", GUILayout.Width(80)))
+        { 
+            // 开始采样
+            m_Sample = true;
+            m_SampleTime = m_StartTime;
+            m_AnimPlayTime = 0f;
+            m_Points.Clear();
+
+            if (m_Trail)
+                DestroyImmediate(m_Trail);
+        }
+
+        GUILayout.EndArea();
+    }
+    
+    
+    #region TrailTest
+    private void Update()
+    {
+        UpdateTrail();
+    }
+
+    int index = 0;
+    void UpdateTrail()
+    {
+        Debug.Log(m_Points.Count);
+
+        if (m_AnimPlayTime > m_Clip.length)
+        {
+            m_DynamicModel.mAnimator.transform.position = Vector3.zero;
+            m_DynamicModel.mAnimator.transform.rotation = Quaternion.identity;
+        }
+        else
+        {
+            for (; index < m_Points.Count; ++index)
+            {
+                if (m_AnimPlayTime < m_Points[index].timeCreated)
+                {
+                    m_Distance = Mathf.Min(m_Points[index].traillength, m_MaxDistance);
+                    if (m_Trail)
+                        DestroyImmediate(m_Trail);
+
+                    CreateWeaponTrail();
+
+                    break;
+                }
+            }
+
+            m_Clip.SampleAnimation(m_MainPlayer, m_AnimPlayTime);
+            m_AnimPlayTime += 0.001f;
+        }
+        //for (int i = 0; i < m_Points.Count; ++i)
+        //{
+        //    if (m_AnimPlayTime - m_Points[i].timeCreated > m_LifeTime)
+        //    {
+        //        m_Points.RemoveAt(i);
+        //        Debug.Log("remove: " + m_Points.Count);
+        //    }
+        //}
+    }
+    
+    void CreateWeaponTrail()
+    {
+        m_Trail = new GameObject("Trail");
+        m_Trail.transform.position = Vector3.zero;
+        m_Trail.transform.rotation = Quaternion.identity;
+        m_Trail.AddComponent<MeshFilter>();
+        m_Trail.AddComponent<MeshRenderer>();
+
+        m_TrailMesh = new Mesh();
+        m_TrailMesh.name = "TrailMesh";
+        m_Trail.GetComponent<MeshFilter>().mesh = m_TrailMesh;
+
+        Texture2D tex = Resources.Load("Swoosh01") as Texture2D;
+        Shader shader = Shader.Find("Particles/Additive");
+        m_Trail.GetComponent<MeshRenderer>().sharedMaterial = new Material(shader);
+        m_Trail.GetComponent<MeshRenderer>().sharedMaterial.SetTexture("_MainTex", tex);
+
+        BuildMesh();
+    }
+    
+     void BuildMesh()
+    {
+        int length = m_Points.Count;
+        if (length > 1)
+        {
+            Vector3[] vertices = new Vector3[length * 2];
+            Vector2[] uv = new Vector2[length * 2];
+            int[] triangles = new int[(length - 1) * 6];
+
+            // 构建mesh数据
+            for (int i = 0; i < length; ++i)
+            {
+                if (m_Points[i].traillength < m_Distance)
+                {
+                    // 顶点
+                    vertices[i * 2] = m_Points[i].basePosition;
+                    vertices[i * 2 + 1] = m_Points[i].tipPosition;
+
+                    // UV坐标
+                    float uvRatio = i / length;
+                    uv[i * 2] = new Vector2(uvRatio, 0);
+                    uv[i * 2 + 1] = new Vector2(uvRatio, 1);
+                    / 三角形
+                    if (i > 0)
+                    {
+                        triangles[(i - 1) * 6] = i * 2 - 2;
+                        triangles[(i - 1) * 6 + 1] = i * 2 - 1;
+                        triangles[(i - 1) * 6 + 2] = i * 2;
+
+                        triangles[(i - 1) * 6 + 3] = i * 2 + 1;
+                        triangles[(i - 1) * 6 + 4] = i * 2;
+                        triangles[(i - 1) * 6 + 5] = i * 2 - 1;
+                    }
+                }
+            }
+
+            m_TrailMesh.vertices = vertices;
+            m_TrailMesh.triangles = triangles;
+            m_TrailMesh.uv = uv;
+        }
+    }
+    
+    void CalculateLength()
+    {
+        // 刀光点距离
+        Point prePoint = m_Points[0];
+        float preDistance = 0f;
+
+        int count = m_Points.Count;
+        for (int i = 1; i < count; ++i)
+        {
+            m_Points[i].traillength = preDistance + ((m_Points[i].basePosition + m_Points[i].tipPosition) / 2 - (prePoint.basePosition + prePoint.tipPosition) / 2).magnitude;
+
+            preDistance = m_Points[i].traillength;
+            prePoint = m_Points[i];
+        }
+        Debug.Log(m_Points[count - 1].traillength);
+    }
+    
