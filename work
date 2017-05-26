@@ -118,12 +118,7 @@ public class AddWeaponTrailWindow : EditorWindow {
             {
                 if (m_AnimPlayTime < m_Points[index].timeCreated)
                 {
-                    m_Distance = Mathf.Min(m_Points[index].traillength, m_MaxDistance);
-                    if (m_Trail)
-                        DestroyImmediate(m_Trail);
-
-                    CreateWeaponTrail();
-
+                    m_Distance = m_Points[index].traillength;
                     break;
                 }
             }
@@ -139,6 +134,11 @@ public class AddWeaponTrailWindow : EditorWindow {
         //        Debug.Log("remove: " + m_Points.Count);
         //    }
         //}
+        
+        if (m_Trail)
+            DestroyImmediate(m_Trail);
+            
+        CreateWeaponTrail();
     }
     
     void CreateWeaponTrail()
@@ -173,7 +173,8 @@ public class AddWeaponTrailWindow : EditorWindow {
             // 构建mesh数据
             for (int i = 0; i < length; ++i)
             {
-                if (m_Points[i].traillength < m_Distance)
+                if (m_Points[i].traillength < m_Distance && (m_Distance < m_MaxDistance ||
+                   (m_Distance > m_MaxDistance && m_Distance - m_Point[i].trailLength < m_MaxDistance))）
                 {
                     // 顶点
                     vertices[i * 2] = m_Points[i].basePosition;
