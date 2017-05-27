@@ -44,7 +44,6 @@ public class AddWeaponTrailWindow : EditorWindow {
     private Mesh m_TrailMesh;                                       // 刀光网格
     private float m_Distance = 0f;
     private float m_MaxDistance = 2.5f;
-    private float m_LifeTime = 0.05f;
     
     public static AddWeaponTrailWindow Instance()
     {
@@ -126,14 +125,6 @@ public class AddWeaponTrailWindow : EditorWindow {
             m_Clip.SampleAnimation(m_MainPlayer, m_AnimPlayTime);
             m_AnimPlayTime += 0.001f;
         }
-        //for (int i = 0; i < m_Points.Count; ++i)
-        //{
-        //    if (m_AnimPlayTime - m_Points[i].timeCreated > m_LifeTime)
-        //    {
-        //        m_Points.RemoveAt(i);
-        //        Debug.Log("remove: " + m_Points.Count);
-        //    }
-        //}
         
         if (m_Trail)
             DestroyImmediate(m_Trail);
@@ -163,44 +154,53 @@ public class AddWeaponTrailWindow : EditorWindow {
     
      void BuildMesh()
     {
+       // 刀光开始收缩
+        if (index == m_Points.Count)
+            m_MaxDistance -= 0.1f;
+
         int length = m_Points.Count;
         if (length > 1)
         {
-            Vector3[] vertices = new Vector3[length * 2];
-            Vector2[] uv = new Vector2[length * 2];
-            int[] triangles = new int[(length - 1) * 6];
+            List<Vector3> vertices = new List<Vector3>();
+            List<Vector2> uvs = new List<Vector2>();
+            List<int> triangles = new List<int>();
 
             // 构建mesh数据
             for (int i = 0; i < length; ++i)
             {
-                if (m_Points[i].traillength < m_Distance && (m_Distance < m_MaxDistance || 
-                   (m_Distance - m_Point[i].trailLength < m_MaxDistance))）
+                if (m_Points[i].trailLength < m_CurDistance && (m_CurDistance < m_MaxDistance ||
+                   (m_CurDistance - m_Points[i].trailLength < m_MaxDistance)))
                 {
                     // 顶点
-                    vertices[i * 2] = m_Points[i].basePosition;
-                    vertices[i * 2 + 1] = m_Points[i].tipPosition;
-
+                    vertices.Add(m_Points[i].basePosition);
+                    vertices.Add(m_Points[i].tipPosition);
+                    
                     // UV坐标
                     float uvRatio = i / length;
-                    uv[i * 2] = new Vector2(uvRatio, 0);
-                    uv[i * 2 + 1] = new Vector2(uvRatio, 1);
-                    / 三角形
-                    if (i > 0)
-                    {
-                        triangles[(i - 1) * 6] = i * 2 - 2;
-                        triangles[(i - 1) * 6 + 1] = i * 2 - 1;
-                        triangles[(i - 1) * 6 + 2] = i * 2;
-
-                        triangles[(i - 1) * 6 + 3] = i * 2 + 1;
-                        triangles[(i - 1) * 6 + 4] = i * 2;
-                        triangles[(i - 1) * 6 + 5] = i * 2 - 1;
-                    }
+                    uvs.Add(new Vector3(uvRatio, 0));
+                    uvs.Add(new Vector2(uvRatio, 1));
                 }
             }
 
-            m_TrailMesh.vertices = vertices;
-            m_TrailMesh.triangles = triangles;
-            m_TrailMesh.uv = uv;
+            int verNum = vertices.Count >> 1;
+            for (int i = 0; i < verNum; ++i)
+            {
+                // 三角形
+                if (i > 0)
+                {
+                    triangles.Add(i * 2 - 2);
+                    triangles.Add(i * 2 - 1);
+                    triangles.Add(i * 2);
+
+                    triangles.Add(i * 2 + 1);
+                    triangles.Add(i * 2);
+                    triangles.Add(i * 2 - 1);
+                }
+            }
+
+            m_TrailMesh.vertices = vertices.ToArray();
+            m_TrailMesh.triangles = triangles.ToArray();
+            m_TrailMesh.uv = uvs.ToArray();
         }
     }
     
@@ -220,4 +220,118 @@ public class AddWeaponTrailWindow : EditorWindow {
         }
         Debug.Log(m_Points[count - 1].traillength);
     }
-}    
+    
+    private void OnEnable()
+    {
+        SceneView.onSceneGUIDelegate += OnSceneGUI;
+    }
+
+    private void OnDestroy()
+    {
+        DestroyImmediate(m_Trail);
+        SceneView.onSceneGUIDelegate -= OnSceneGUI;
+    }
+
+    private void OnSceneGUI(SceneView sceneView)
+    {
+        List<Vector3> basePoints = new List<Vector3>();
+        List<Vector3> tipPoints = new List<Vector3>();
+        foreach (Point p in m_Points)
+        {
+            basePoints.Add(p.basePosition);
+            tipPoints.Add(p.tipPosition);
+
+            Handles.color = Color.yellow;
+            Handles.DrawLine(p.basePosition, p.tipPosition);
+        }
+        
+        Handles.color = Color.red;
+        Handles.DrawAAPolyLine(basePoints.ToArray());
+        Handles.DrawAAPolyLine(tipPoints.ToArray());
+    }
+
+    // 序列化保存刀光采样点
+    void SaveSamplePoints()
+    {
+        string prefabName = m_DynamicModel.mResName;
+        string fileName = Application.dataPath + @"/Prefab/Skill/" + prefabName + @"/Resources/" + prefabName + "_" + m_AnimName + "_" + "WeaponTrail" + ".xml";
+
+        XmlDocument xmlDoc = new XmlDocument();
+        XmlDeclaration xmlDecl = xmlDoc.CreateXmlDeclaration("1.0", "UTF-8", null);
+        xmlDoc.AppendChild(xmlDecl);
+
+        XmlElement dataNode = xmlDoc.CreateElement("TrailData");
+        // 时间属性
+        dataNode.SetAttribute("StartTime", m_StartTime.ToString());
+        dataNode.SetAttribute("EndTime", m_EndTime.ToString());
+        dataNode.SetAttribute("Interval", m_Interval.ToString());
+        xmlDoc.AppendChild(dataNode);
+        
+         int length = m_Points.Count;
+        for(int i = 0; i < length; ++i)
+        {
+            XmlElement posNode = xmlDoc.CreateElement("Position");
+
+            XmlElement basePos = xmlDoc.CreateElement("BasePos");
+            basePos.InnerText = m_Points[i].basePosition.x + "," + m_Points[i].basePosition.y + "," + m_Points[i].basePosition.z;
+
+            XmlElement tipPos = xmlDoc.CreateElement("TipPos");
+            tipPos.InnerText = m_Points[i].tipPosition.x + "," + m_Points[i].tipPosition.y + "," + m_Points[i].tipPosition.z;
+
+            XmlElement trailLength = xmlDoc.CreateElement("TrailLength");
+            trailLength.InnerText = m_Points[i].trailLength.ToString();
+
+            XmlElement time = xmlDoc.CreateElement("TimeCreated");
+            time.InnerText = m_Points[i].timeCreated.ToString();
+            
+            posNode.AppendChild(basePos);
+            posNode.AppendChild(tipPos);
+            posNode.AppendChild(trailLength);
+            posNode.AppendChild(time);
+            dataNode.AppendChild(posNode);
+        }
+
+        xmlDoc.Save(fileName);
+    }
+    
+    public static void LoadSamplePoints(string fileName, List<Point> points)
+    {
+        // 读取xml
+        TextAsset textAsset = Resources.Load(fileName) as TextAsset;
+        XmlDocument xmlDoc = new XmlDocument();
+
+        try
+        {
+            xmlDoc.Load(new MemoryStream(textAsset.bytes));
+        }
+        catch(Exception e)
+        {
+            Debug.LogError(fileName + e.StackTrace + e.Message);
+            return;
+        }
+        
+        XmlNodeList dataNodeList = xmlDoc.GetElementsByTagName("TrailData");
+        for(int i = 0; i < dataNodeList.Count; ++i)
+        {
+            XmlNode dataChild = dataNodeList[i];
+            XmlNodeList allPosNodes = dataChild.ChildNodes;
+
+            for(int j = 0; j < allPosNodes.Count; ++j)
+            {
+                XmlNode posNode = allPosNodes[j];
+                XmlNodeList baseTipNode = posNode.ChildNodes;
+                
+                string[] basePos = baseTipNode[0].InnerText.Split(',');
+                string[] tipPos = baseTipNode[1].InnerText.Split(',');
+                string trailLength = baseTipNode[2].InnerText;
+                string time = baseTipNode[3].InnerText;
+
+                Point p = new Point(new Vector3(float.Parse(basePos[0]), float.Parse(basePos[1]), float.Parse(basePos[2])),
+                                    new Vector3(float.Parse(tipPos[0]), float.Parse(tipPos[1]), float.Parse(tipPos[2])),
+                                    float.Parse(time), float.Parse(trailLength));
+                points.Add(p);
+            }
+        }
+    }
+}
+  
