@@ -64,6 +64,8 @@ public class AddWeaponTrailWindow : EditorWindow {
         // Load XML
         string fileName = m_DynamicModel.mResName + "_" + m_AnimName + "_" + "WeaponTrail";
         LoadSamplePoints(fileName, m_Points);
+        
+        CreateWeaponTrail();
     }
     
     private void OnGUI()
@@ -126,10 +128,7 @@ public class AddWeaponTrailWindow : EditorWindow {
             m_AnimPlayTime += 0.001f;
         }
         
-        if (m_Trail)
-            DestroyImmediate(m_Trail);
-            
-        CreateWeaponTrail();
+        BuildMesh();
     }
     
     void CreateWeaponTrail()
@@ -152,9 +151,11 @@ public class AddWeaponTrailWindow : EditorWindow {
         BuildMesh();
     }
     
-     void BuildMesh()
+    void BuildMesh()
     {
-       // 刀光开始收缩
+        m_TrailMesh.Clear();
+    
+        // 刀光开始收缩
         if (index == m_Points.Count)
             m_MaxDistance -= 0.1f;
 
