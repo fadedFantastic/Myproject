@@ -125,7 +125,9 @@ public class AddWeaponTrailWindow : EditorWindow {
             }
 
             m_Clip.SampleAnimation(m_MainPlayer, m_AnimPlayTime);
-            m_AnimPlayTime += 0.001f;
+            m_DynamicModel.mAnimator.CrossFade(m_AnimName, 0f, 0, m_AnimPlayTime / m_Clip.length);
+            m_DynamicModel.mAnimator.Update(0.005f);
+            m_AnimPlayTime += 0.005f;
         }
         
         BuildMesh();
