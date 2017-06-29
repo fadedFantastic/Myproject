@@ -1,0 +1,36 @@
+继承自EventTrigger，实现自己的事件系统， 
+public class EventTriggerListener : EventTrigger
+{
+
+    public delegate void VoidDelegate(GameObject go);
+    public delegate void BoolDelegate(GameObject go , bool state);
+    public delegate void FloatDelegate(GameObject go, float delta);
+    public delegate void VectorDelegate(GameObject go, Vector2 delta);
+
+    public VoidDelegate onClick;
+    public VoidDelegate onDown;
+    public VoidDelegate onEnter;
+    public VoidDelegate onSelect;
+    public VoidDelegate onUp;
+    public VoidDelegate onExit;
+    public VoidDelegate onUpdateSelected;
+
+    public BoolDelegate onPress;
+    
+    public static EventTriggerListener Get(GameObject go)
+    {
+        EventTriggerListener listener = go.GetComponent<EventTriggerListener>();
+        if (null == listener) listener = go.AddComponent<EventTriggerListener>();
+        return listener;
+    }
+
+    public override void OnPointerClick(PointerEventData eventData)
+    {
+        if (null != onClick) onClick(gameObject);
+    }
+
+    public override void OnPointerEnter(PointerEventData eventData)
+    {
+        if (null != onEnter) onEnter(gameObject);
+    }
+    }
