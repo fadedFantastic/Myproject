@@ -1,0 +1,32 @@
+using UnityEngine;
+using System.Collections;
+
+public enum AreaGridType : byte
+{
+    None,
+    Sand,
+    Grass,
+    House,
+}
+
+public enum UserBrushState : byte
+{
+    None,
+    AddBlcok,
+    RemoveBlock,
+}
+
+public class AreaGridComponent : MonoBehaviour {
+
+    public int numberOfRows = 0;
+    public int numberOfColumn = 0;
+    public AreaGridType[,] mergedAreaType;
+    public Color[] areaGridColor = { Color.white, Color.yellow, Color.green, Color.red };
+
+    private float m_CellSize = 1f;
+
+    private void OnDrawGizmos()
+    {
+        
+    }
+}
