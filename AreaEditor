@@ -1,0 +1,169 @@
+using UnityEngine;
+using System.Collections;
+using UnityEditor;
+using UnityEditor.SceneManagement;
+
+public class AreaEditor : EditorWindow
+{
+    static AreaEditor m_CurrentWindow = null;
+    static int m_CurrentWindowHandle = 0;
+    private string m_CurrentSceneName = string.Empty;
+    private AreaGridComponent m_AreaGrid;
+
+    private bool m_LeftMouseDown = false; 
+
+    // 当前笔刷类型
+    private AreaGridType m_CurrentBrushType = AreaGridType.None;
+    // 当前笔刷状态
+    private UserBrushState m_CurrentBrushState = UserBrushState.AddBlcok;
+    // 笔刷大小
+    private float m_BrushSize = 1f;
+    
+    [MenuItem("Window/地形区域")]
+    static void ShowWindow()
+    {
+        if (m_CurrentWindowHandle != 0)
+            return;
+
+        m_CurrentWindow = GetWindow<AreaEditor>("AreaEditor");
+        m_CurrentWindow.minSize = new Vector2(800, 400);
+        m_CurrentWindowHandle = m_CurrentWindow.GetInstanceID();
+        m_CurrentWindow.Initialize();
+    }
+
+    /// <summary>
+    /// 初始化
+    /// </summary>
+    private void Initialize()
+    {
+        m_AreaGrid = null;
+        CreateAreaGrid();
+        SceneView.onSceneGUIDelegate += OnSceneGUI;
+    }
+
+    private void Uninitialize()
+    {
+        SceneView.onSceneGUIDelegate -= OnSceneGUI;
+    }
+    
+    private void OnDestroy()
+    {
+        Uninitialize();
+        m_CurrentWindowHandle = 0;
+    }
+
+    private void OnGUI()
+    {
+        m_CurrentSceneName = EditorSceneManager.GetActiveScene().name;
+        GUILayout.Label(string.Format("当前游戏场景名称：{0}", m_CurrentSceneName));
+
+        // 不同区域类型选择
+        EditorGUILayout.BeginHorizontal("box");
+        GUILayout.Label("地形区域类型： ");
+
+        GUI.color = m_AreaGrid.areaGridColor[(int)AreaGridType.None];
+        if(GUILayout.Toggle(m_CurrentBrushType == AreaGridType.None, "无"))
+        {
+            m_CurrentBrushType = AreaGridType.None;
+        }
+        GUI.color = m_AreaGrid.areaGridColor[(int)AreaGridType.Sand];
+        if (GUILayout.Toggle(m_CurrentBrushType == AreaGridType.Sand, "沙地"))
+        {
+            m_CurrentBrushType = AreaGridType.Sand;
+        }
+        GUI.color = m_AreaGrid.areaGridColor[(int)AreaGridType.Grass];
+        if (GUILayout.Toggle(m_CurrentBrushType == AreaGridType.Grass, "草地"))
+        {
+            m_CurrentBrushType = AreaGridType.Grass;
+        }
+        GUI.color = m_AreaGrid.areaGridColor[(int)AreaGridType.House];
+        if (GUILayout.Toggle(m_CurrentBrushType == AreaGridType.House, "房子"))
+        {
+            m_CurrentBrushType = AreaGridType.House;
+        }
+        EditorGUILayout.EndHorizontal();
+    }
+    
+    private void OnSceneGUI(SceneView sceneView)
+    {
+        int controlID = GUIUtility.GetControlID(FocusType.Passive);
+        Event current = Event.current;
+        switch(current.type)
+        {
+            case EventType.MouseUp:
+                if (current.isMouse && current.button == 0)
+                    m_LeftMouseDown = false;
+                break;
+            case EventType.MouseDown:
+                if (current.isMouse && current.button == 0)
+                    m_LeftMouseDown = true;
+                OnPen(current);
+                break;
+            case EventType.MouseDrag:
+                OnPen(current);
+                break;
+                case EventType.MouseMove:
+                HandleUtility.Repaint();
+                break;
+            // 重绘笔刷
+            case EventType.Repaint:
+                DrawHandle();
+                break;
+            // 编辑模式下禁止选中物体
+            case EventType.Layout:
+                HandleUtility.AddDefaultControl(controlID);
+                break;
+        }
+    }
+    
+    void OnPen(Event current)
+    {
+        if(m_LeftMouseDown)
+        {
+            // 设置笔刷类型
+            if(!current.shift && !current.control)
+            {
+                m_CurrentBrushState = UserBrushState.AddBlcok;
+            }
+            else if(current.control)
+            {
+                m_CurrentBrushState = UserBrushState.RemoveBlock;
+            }
+            else if(current.shift)
+            {
+                m_CurrentBrushState = UserBrushState.None;
+            }
+            HandleUtility.Repaint();
+        }
+    }
+    
+    /// <summary>
+    /// 绘制笔刷
+    /// </summary>
+    void DrawHandle()
+    {
+        RaycastHit hit;
+        Ray ray = HandleUtility.GUIPointToWorldRay(Event.current.mousePosition);
+        if(Physics.Raycast(ray, out hit, float.MaxValue))
+        {
+            Handles.color = Color.red;
+            Handles.DrawWireDisc(hit.point, hit.normal, m_BrushSize);
+        }
+    }
+    
+    private void CreateAreaGrid()
+    {
+        GameObject areaGrid = GameObject.Find("[AreaGrid]");
+        if (areaGrid == null)
+        {
+            areaGrid = new GameObject("[AreaGrid]");
+            areaGrid.transform.position = Vector3.zero;
+            areaGrid.transform.rotation = Quaternion.identity;
+            m_AreaGrid = areaGrid.AddComponent<AreaGridComponent>();
+        }
+        else
+        {
+            m_AreaGrid = areaGrid.GetComponent<AreaGridComponent>();
+        }
+    }
+}
