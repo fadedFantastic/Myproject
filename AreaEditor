@@ -81,6 +81,22 @@ public class AreaEditor : EditorWindow
         {
             m_CurrentBrushType = AreaGridType.House;
         }
+        GUI.color = m_AreaGrid.areaGridColor[(int)AreaGridType.Snow];
+        if (GUILayout.Toggle(m_CurrentBrushType == AreaGridType.Snow, "雪地"))
+        {
+            m_CurrentBrushType = AreaGridType.Snow;
+        }
+        EditorGUILayout.EndHorizontal();
+        
+         EditorGUILayout.BeginHorizontal("box");
+        if(GUILayout.Button("重新烘焙高度信息"))
+        {
+            BakeHeightMap();
+        }
+        if(GUILayout.Button("清理所有区域类型信息"))
+        {
+            ClearAreaGridType();
+        }
         EditorGUILayout.EndHorizontal();
     }
     
@@ -133,6 +149,7 @@ public class AreaEditor : EditorWindow
             {
                 m_CurrentBrushState = UserBrushState.None;
             }
+            BrushGridInsideArea();
             HandleUtility.Repaint();
         }
     }
@@ -151,6 +168,60 @@ public class AreaEditor : EditorWindow
         }
     }
     
+    void BrushGridInsideArea()
+    {
+        RaycastHit hit;
+        Ray ray = HandleUtility.GUIPointToWorldRay(Event.current.mousePosition);
+        
+        if(Physics.Raycast(ray, out hit, float.MaxValue))
+        {
+            if(m_BrushSize < 0.3f)
+            {
+                // TODO: the origin is not zero, how to handle it 
+                int c = (int)(hit.point.x / m_AreaGrid.cellSize);
+                int r = (int)(hit.point.z / m_AreaGrid.cellSize);
+                UpdateAreaGridType(c, r);
+            }
+            else
+            {
+
+            }
+        }
+    }
+    
+    /// <summary>
+    /// 更新区域网格类型信息
+    /// </summary>
+    void UpdateAreaGridType(int column, int row)
+    {
+        if (column < 0 || column >= m_AreaGrid.numberOfColumn)
+            return;
+        if (row < 0 || row >= m_AreaGrid.numberOfRow)
+            return;
+
+        switch(m_CurrentBrushState)
+        {
+            case UserBrushState.None:
+                break;
+            case UserBrushState.AddBlcok:
+                m_AreaGrid.mergedAreaType[row * m_AreaGrid.numberOfColumn + column] = m_CurrentBrushType;
+                break;
+            case UserBrushState.RemoveBlock:
+                m_AreaGrid.mergedAreaType[row * m_AreaGrid.numberOfColumn + column] = AreaGridType.None;
+                break;
+        }
+    }
+    
+    // 清理区域网格类型信息
+    void ClearAreaGridType()
+    {
+        int length = m_AreaGrid.mergedAreaType.Length;
+        for(int i = 0; i < length; ++i)
+        {
+            m_AreaGrid.mergedAreaType[i] = AreaGridType.None;
+        }
+    }
+    
     private void CreateAreaGrid()
     {
         GameObject areaGrid = GameObject.Find("[AreaGrid]");
@@ -164,6 +235,47 @@ public class AreaEditor : EditorWindow
         else
         {
             m_AreaGrid = areaGrid.GetComponent<AreaGridComponent>();
+        }
+    }
+    
+    void SetAreaInfo()
+    {
+        // TODO: when areaMesh is Null
+        Mesh areaMesh = GameObject.FindWithTag("Floor").GetComponent<MeshFilter>().sharedMesh;
+        float entireAreaWidth = areaMesh.bounds.size.x;
+        float entireAreaLength = areaMesh.bounds.size.z;
+        Vector3 areaCenter = areaMesh.bounds.center;
+
+        m_AreaGrid.numberOfRow = (int)Mathf.Round(entireAreaLength);
+        m_AreaGrid.numberOfColumn = (int)Mathf.Round(entireAreaWidth);
+        m_AreaGrid.areaOrigin = new Vector3(areaCenter.x - entireAreaWidth / 2f, 0, areaCenter.z - entireAreaLength / 2f);
+        m_AreaGrid.mergedAreaType = new AreaGridType[m_AreaGrid.numberOfRow * m_AreaGrid.numberOfColumn];
+        m_AreaGrid.heightMap = new float[m_AreaGrid.numberOfRow * m_AreaGrid.numberOfColumn];
+    }
+    
+    /// <summary>
+    /// 烘焙高度信息
+    /// </summary>
+    void BakeHeightMap()
+    {
+        Ray ray = new Ray();
+        ray.direction = Vector3.down;
+        Vector3 rayStart = new Vector3();
+        rayStart.y = m_AreaGrid.transform.position.y + 1000f;
+
+        RaycastHit hit;
+        for(int i = 0; i < m_AreaGrid.numberOfRow; ++i)
+        {
+            rayStart.x = m_AreaGrid.areaOrigin.x + i;
+            for (int j = 0; j < m_AreaGrid.numberOfColumn; ++j)
+            {
+                rayStart.z = m_AreaGrid.areaOrigin.z + j;
+                ray.origin = rayStart;
+                if(Physics.Raycast(ray, out hit, float.MaxValue))
+                {
+                    m_AreaGrid.heightMap[i * m_AreaGrid.numberOfColumn + j] = hit.point.y;
+                }
+            }
         }
     }
 }
