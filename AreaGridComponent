@@ -7,6 +7,7 @@ public enum AreaGridType : byte
     Sand,
     Grass,
     House,
+    Snow,
 }
 
 public enum UserBrushState : byte
@@ -18,12 +19,12 @@ public enum UserBrushState : byte
 
 public class AreaGridComponent : MonoBehaviour {
 
-    public int numberOfRows = 0;
-    public int numberOfColumn = 0;
-    public AreaGridType[,] mergedAreaType;
-    public Color[] areaGridColor = { Color.white, Color.yellow, Color.green, Color.red };
+   [HideInInspector] public Vector3 areaOrigin = Vector3.zero;
+    public AreaGridType[] mergedAreaType = null;
+    [HideInInspector] public float[] heightMap = null;
+    public Color[] areaGridColor = { Color.white, Color.yellow, Color.green, Color.red, Color.white };
 
-    private float m_CellSize = 1f;
+    public  float cellSize = 1f;
 
     private void OnDrawGizmos()
     {
