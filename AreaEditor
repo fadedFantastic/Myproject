@@ -175,16 +175,48 @@ public class AreaEditor : EditorWindow
         
         if(Physics.Raycast(ray, out hit, float.MaxValue))
         {
-            if(m_BrushSize < 0.3f)
+            float hitPointX = hit.point.x - m_AreaGrid.areaOrigin.x;
+            float hitPointZ = hit.point.z - m_AreaGrid.areaOrigin.z;
+            if (m_BrushSize < 0.3f)
             {
-                // TODO: the origin is not zero, how to handle it 
-                int c = (int)(hit.point.x / m_AreaGrid.cellSize);
-                int r = (int)(hit.point.z / m_AreaGrid.cellSize);
+                int c = (int)(hitPointX / m_AreaGrid.cellSize);
+                int r = (int)(hitPointZ / m_AreaGrid.cellSize);
                 UpdateAreaGridType(c, r);
             }
             else
             {
+                float step = m_AreaGrid.cellSize * 0.5f;
+                Vector3 min = new Vector3(hitPointX - m_BrushSize, 0, hitPointZ - m_BrushSize);
+                Vector3 max = new Vector3(hitPointX + m_BrushSize, 0, hitPointZ + m_BrushSize);
+                int minXGrid = (int)(min.x / m_AreaGrid.cellSize) - 1;
+                int maxXGrid = (int)(max.x / m_AreaGrid.cellSize) + 1;
+                int minZGrid = (int)(min.z / m_AreaGrid.cellSize) - 1;
+                int maxZGrid = (int)(max.z / m_AreaGrid.cellSize) + 1;
 
+                if(minXGrid < 0)
+                {
+                    minXGrid = 0;
+                }
+                if(minZGrid < 0)
+                {
+                    minZGrid = 0;
+                }
+                Vector2 center = new Vector2(hitPointX, hitPointZ);
+                for(int r = minZGrid; r <= maxZGrid && r < m_AreaGrid.numberOfRow; ++r)
+                {
+                    for(int c = minXGrid; c <= maxXGrid && c < m_AreaGrid.numberOfColumn; ++c)
+                    {
+                        // 网格中心
+                        Vector2 gridCenter = new Vector2(c * m_AreaGrid.cellSize + step,
+                                                         r * m_AreaGrid.cellSize + step);
+
+                        // 网格中心是否在笔刷圆圈范围内
+                        if((gridCenter - center).magnitude <= m_BrushSize)
+                        {
+                            UpdateAreaGridType(c, r);
+                        }
+                    }
+                }
             }
         }
     }
@@ -264,16 +296,16 @@ public class AreaEditor : EditorWindow
         rayStart.y = m_AreaGrid.transform.position.y + 1000f;
 
         RaycastHit hit;
-        for(int i = 0; i < m_AreaGrid.numberOfRow; ++i)
+        for(int r = 0; r < m_AreaGrid.numberOfRow; ++r)
         {
-            rayStart.x = m_AreaGrid.areaOrigin.x + i;
-            for (int j = 0; j < m_AreaGrid.numberOfColumn; ++j)
+            rayStart.z = m_AreaGrid.areaOrigin.z + (r + 0.5f) * m_AreaGrid.cellSize;
+            for (int c = 0; c < m_AreaGrid.numberOfColumn; ++c)
             {
-                rayStart.z = m_AreaGrid.areaOrigin.z + j;
+                rayStart.x = m_AreaGrid.areaOrigin.x + (c + 0.5f) * m_AreaGrid.cellSize;
                 ray.origin = rayStart;
                 if(Physics.Raycast(ray, out hit, float.MaxValue))
                 {
-                    m_AreaGrid.heightMap[i * m_AreaGrid.numberOfColumn + j] = hit.point.y;
+                    m_AreaGrid.heightMap[r * m_AreaGrid.numberOfColumn + c] = hit.point.y;
                 }
             }
         }
