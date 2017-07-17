@@ -6,7 +6,7 @@ public enum AreaGridType : byte
     None,
     Sand,
     Grass,
-    House,
+    Block,
     Snow,
 }
 
@@ -25,9 +25,41 @@ public class AreaGridComponent : MonoBehaviour {
     public Color[] areaGridColor = { Color.white, Color.yellow, Color.green, Color.red, Color.white };
 
     public  float cellSize = 1f;
+    private float cubeSize = 0.8f;
 
+    [SerializeField] private bool showHeightGizmos = false;
+
+#if UNITY_EDITOR
     private void OnDrawGizmos()
     {
-        
+        float hSize = cellSize * cubeSize;
+        Vector3 blockSize = new Vector3(hSize, hSize / 10, hSize);
+        for (int r = 0; r < numberOfRow; ++r)
+        {
+            for (int c = 0; c < numberOfColumn; ++c)
+            {
+                if (mergedAreaType[r * numberOfColumn + c] == AreaGridType.None)
+                    continue;
+
+                Gizmos.color = areaGridColor[(int)mergedAreaType[r * numberOfColumn + c]];
+                Gizmos.DrawCube(new Vector3(areaOrigin.x + (c + 0.5f) * cellSize,
+                                            0f,
+                                            areaOrigin.z + (r + 0.5f) * cellSize),
+                                            blockSize);
+            }
+            if(showHeightGizmos)
+        {
+            for(int r = 0; r < numberOfRow; ++r)
+            {
+                for(int c = 0; c < numberOfColumn; ++c)
+                {
+                    Gizmos.DrawCube(new Vector3(areaOrigin.x + (c + 0.5f) * cellSize,
+                                                heightMap[r * numberOfColumn + c],
+                                                areaOrigin.z + (r + 0.5f) * cellSize),
+                                                blockSize);
+                }
+            }
+        }
     }
+#endif
 }
