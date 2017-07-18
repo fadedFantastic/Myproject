@@ -294,8 +294,12 @@ public class AreaEditor : EditorWindow
     
     void SetAreaInfo()
     {
-        // TODO: when areaMesh is Null
-        Mesh areaMesh = GameObject.FindWithTag("Floor").GetComponent<MeshFilter>().sharedMesh;
+        Mesh areaMesh = null;
+        if (GameObject.FindWithTag("Floor"))
+            areaMesh = GameObject.FindWithTag("Floor").GetComponent<MeshFilter>().sharedMesh;
+        else
+            return;
+        
         float entireAreaWidth = areaMesh.bounds.size.x;
         float entireAreaLength = areaMesh.bounds.size.z;
         Vector3 areaCenter = areaMesh.bounds.center;
