@@ -18,6 +18,7 @@ public class AreaEditor : EditorWindow
     private UserBrushState m_CurrentBrushState = UserBrushState.AddBlcok;
     // 笔刷大小
     private float m_BrushSize = 1f;
+    private float m_CellSize = 1f;
     
     [MenuItem("Window/地形区域")]
     static void ShowWindow()
@@ -36,19 +37,23 @@ public class AreaEditor : EditorWindow
     /// </summary>
     private void Initialize()
     {
-        m_AreaGrid = null;
         CreateAreaGrid();
+        BakeHeightMap();
+        m_CurrentSceneName = EditorSceneManager.GetActiveScene().name;
         SceneView.onSceneGUIDelegate += OnSceneGUI;
+        EditorApplication.hierarchyWindowChanged += OnHierarchyChange;
     }
 
-    private void Uninitialize()
+   private void OnHierarchyChange()
     {
-        SceneView.onSceneGUIDelegate -= OnSceneGUI;
+        if (m_CurrentSceneName != EditorSceneManager.GetActiveScene().name)
+            Close();
     }
-    
+
     private void OnDestroy()
     {
-        Uninitialize();
+        SceneView.onSceneGUIDelegate -= OnSceneGUI;
+        EditorApplication.hierarchyWindowChanged -= OnHierarchyChange;
         m_CurrentWindowHandle = 0;
     }
 
@@ -85,6 +90,20 @@ public class AreaEditor : EditorWindow
         if (GUILayout.Toggle(m_CurrentBrushType == AreaGridType.Snow, "雪地"))
         {
             m_CurrentBrushType = AreaGridType.Snow;
+        }
+        EditorGUILayout.EndHorizontal();
+        
+        EditorGUILayout.BeginHorizontal("box");
+        GUILayout.Label(string.Format("笔刷大小：{0}", m_BrushSize));
+        m_BrushSize = GUILayout.HorizontalSlider(m_BrushSize, 0.2f, 8f);
+        GUILayout.Space(30);
+
+        EditorGUI.BeginChangeCheck();
+        GUILayout.Label(string.Format("网格大小：{0}", m_CellSize));
+        m_CellSize = GUILayout.HorizontalSlider(m_CellSize, 0.5f, 1f);
+        if(EditorGUI.EndChangeCheck())
+        {
+            SetAreaInfo();
         }
         EditorGUILayout.EndHorizontal();
         
@@ -263,10 +282,12 @@ public class AreaEditor : EditorWindow
             areaGrid.transform.position = Vector3.zero;
             areaGrid.transform.rotation = Quaternion.identity;
             m_AreaGrid = areaGrid.AddComponent<AreaGridComponent>();
+            SetAreaInfo();
         }
         else
         {
             m_AreaGrid = areaGrid.GetComponent<AreaGridComponent>();
+            m_CellSize = m_AreaGrid.cellSize;
         }
     }
     
@@ -278,6 +299,7 @@ public class AreaEditor : EditorWindow
         float entireAreaLength = areaMesh.bounds.size.z;
         Vector3 areaCenter = areaMesh.bounds.center;
 
+        m_AreaGrid.cellSize = m_CellSize;
         m_AreaGrid.numberOfRow = (int)Mathf.Round(entireAreaLength);
         m_AreaGrid.numberOfColumn = (int)Mathf.Round(entireAreaWidth);
         m_AreaGrid.areaOrigin = new Vector3(areaCenter.x - entireAreaWidth / 2f, 0, areaCenter.z - entireAreaLength / 2f);
