@@ -52,6 +52,7 @@ public class AreaEditor : EditorWindow
 
     private void OnDestroy()
     {
+        EditorSceneManager.SaveScene(EditorSceneManager.GetActiveScene());
         SceneView.onSceneGUIDelegate -= OnSceneGUI;
         EditorApplication.hierarchyWindowChanged -= OnHierarchyChange;
         m_CurrentWindowHandle = 0;
