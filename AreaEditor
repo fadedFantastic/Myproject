@@ -9,6 +9,7 @@ public class AreaEditor : EditorWindow
     static int m_CurrentWindowHandle = 0;
     private string m_CurrentSceneName = string.Empty;
     private AreaGridComponent m_AreaGrid;
+    private GameObject m_TargetFloor = null;
 
     private bool m_LeftMouseDown = false; 
 
@@ -60,6 +61,9 @@ public class AreaEditor : EditorWindow
 
     private void OnGUI()
     {
+        if (!m_AreaGrid)
+            return;
+    
         m_CurrentSceneName = EditorSceneManager.GetActiveScene().name;
         GUILayout.Label(string.Format("当前游戏场景名称：{0}", m_CurrentSceneName));
 
@@ -277,13 +281,17 @@ public class AreaEditor : EditorWindow
     private void CreateAreaGrid()
     {
         GameObject areaGrid = GameObject.Find("[AreaGrid]");
+        m_TargetFloor = GameObject.FindWithTag("Floor");
         if (areaGrid == null)
         {
-            areaGrid = new GameObject("[AreaGrid]");
-            areaGrid.transform.position = Vector3.zero;
-            areaGrid.transform.rotation = Quaternion.identity;
-            m_AreaGrid = areaGrid.AddComponent<AreaGridComponent>();
-            SetAreaInfo();
+            if(m_TargetFloor)
+            {
+                areaGrid = new GameObject("[AreaGrid]");
+                areaGrid.transform.position = Vector3.zero;
+                areaGrid.transform.rotation = Quaternion.identity;
+                m_AreaGrid = areaGrid.AddComponent<AreaGridComponent>();
+                SetAreaData();
+            }
         }
         else
         {
@@ -294,11 +302,7 @@ public class AreaEditor : EditorWindow
     
     void SetAreaInfo()
     {
-        Mesh areaMesh = null;
-        if (GameObject.FindWithTag("Floor"))
-            areaMesh = GameObject.FindWithTag("Floor").GetComponent<MeshFilter>().sharedMesh;
-        else
-            return;
+        Mesh areaMesh = m_TargetFloor.GetComponent<MeshFilter>().sharedMesh;
         
         float entireAreaWidth = areaMesh.bounds.size.x;
         float entireAreaLength = areaMesh.bounds.size.z;
@@ -317,6 +321,9 @@ public class AreaEditor : EditorWindow
     /// </summary>
     void BakeHeightMap()
     {
+        if (!m_AreaGrid)
+            return;
+        
         Ray ray = new Ray();
         ray.direction = Vector3.down;
         Vector3 rayStart = new Vector3();
