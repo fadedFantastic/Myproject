@@ -1,0 +1,109 @@
+[InitializeOnLoad]
+public class UICustomHierarchy {
+    /// <summary>  
+    /// 内部类存储图标
+    /// </summary>  
+    public static class Icons {
+        static string mIconPath = "Assets/Editor/UIEditorTools/Images/01.png";
+        public static Texture2D UIParentRootIcon;
+
+        public static void Initialize() {
+            UIParentRootIcon = (Texture2D)AssetDatabase.LoadMainAssetAtPath(mIconPath);
+        }
+    }
+    
+     [MenuItem("GameObject/Hierarchy显示/NGUIDepth", false, 0)]
+    static void ChangeToNGUIDepth() {
+        mType = HierarchyShowType.NGUIDepth;
+    }
+    [MenuItem("GameObject/Hierarchy显示/Layer", false, 1)]
+    static void ChangeToLayer() {
+        mType = HierarchyShowType.Layer;
+    }
+    [MenuItem("GameObject/Hierarchy显示/Tag", false, 2)]
+    static void ChangeToTag() {
+        mType = HierarchyShowType.Tag;
+    }
+
+    /// <summary>
+    /// Hierarchy的拓展显示类型
+    /// </summary>
+    public enum HierarchyShowType {
+        NGUIDepth, Layer, Tag
+    }
+    
+    // 默认显示NGUIDe
+    static HierarchyShowType mType = HierarchyShowType.NGUIDepth;
+    static Map<int, GameObject> mAllExportObjects = new Map<int, GameObject>();
+
+    static UICustomHierarchy() {
+        //Icons.Initialize();
+        //EditorApplication.hierarchyWindowChanged += HierarchyWindowChanged;
+        EditorApplication.hierarchyWindowItemOnGUI += HierarchyWindowItemOnGUI;
+        //HierarchyWindowChanged();
+    }
+    
+    static void HierarchyWindowChanged() {
+        if (Application.isPlaying)
+            return;
+        UIRoot[] uiroots = GameObject.FindObjectsOfType<UIRoot>();
+        if (uiroots.Length == 0)
+            return;
+        mAllExportObjects.Clear();
+        foreach (var root in uiroots) {
+            AttachGameobjects(root.gameObject);
+        }
+
+        FLogger.Log("1111111111111111111");
+    }
+    
+    static void HierarchyWindowItemOnGUI(int instanceId, Rect selectionRect) {
+
+        if (Event.current.type == EventType.Repaint) { //only do actual draw on Repaint
+                                                       //GUI.DrawTexture(r, Icons.UIParentRootIcon);
+            var go = EditorUtility.InstanceIDToObject(instanceId) as GameObject;
+            if (go == null) {
+                return;
+            }
+
+            Color color = Color.white;
+            string str = string.Empty;
+            if (mType == HierarchyShowType.NGUIDepth) {
+                UIWidget ui = go.GetComponent<UIWidget>();
+                if (ui == null) {
+                    UIPanel panel = go.GetComponent<UIPanel>();
+                    if (panel == null)
+                        return;
+                    color = new Color(1f, 1f, 0f);
+                    str = panel.depth.ToString();
+                }
+                else {
+                    color = Color.white;
+                    str = ui.depth.ToString();
+                }
+            }
+            else if (mType == HierarchyShowType.Layer) {
+                str = LayerMask.LayerToName(go.layer);
+            }
+            else if (mType == HierarchyShowType.Tag) {
+                str = go.tag;
+            }
+            GUIContent content = new GUIContent(str);
+            float width = EditorStyles.miniLabel.CalcSize(content).x;
+            float xwidth = selectionRect.xMax - width;
+            Rect r = new Rect(xwidth, selectionRect.y, width, selectionRect.height);
+            GUI.contentColor = color;
+            GUI.Label(r, content, EditorStyles.miniLabel);
+            GUI.contentColor = Color.white;
+        }
+
+    }
+
+    static void AttachGameobjects(GameObject root) {
+        mAllExportObjects.Add(root.GetInstanceID(), root);
+        for (int i = 0; i < root.transform.childCount; i++) {
+            AttachGameobjects(root.transform.GetChild(i).gameObject);
+        }
+    }
+}
+            
