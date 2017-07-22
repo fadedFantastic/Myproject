@@ -1,5 +1,5 @@
 [InitializeOnLoad]
-public class UICustomHierarchy {
+pulbic class UICustomHierarchy {
     /// <summary>  
     /// 内部类存储图标
     /// </summary>  
