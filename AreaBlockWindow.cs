@@ -16,7 +16,9 @@ public class AreaBlockWindow : EditorWindow
 
     private Vector2 m_ScrollPos = Vector2.zero;
     private string m_CurSelectedBlockName = string.Empty;
-    private Color m_OriginGUIColor; 
+    private Color m_OriginGUIColor;
+
+    private bool m_Creating = false;
 
     public static AreaBlockWindow Instance()
     {
@@ -31,13 +33,9 @@ public class AreaBlockWindow : EditorWindow
 
     private void Initialize()
     {
+        SceneView.onSceneGUIDelegate += OnSceneGUI;
         m_CurrentSceneName = EditorSceneManager.GetActiveScene().name;
         GenerateBlockContainer();
-    }
-
-    private void OnEnable()
-    {
-        SceneView.onSceneGUIDelegate += OnSceneGUI;
     }
 
     private void OnDestroy()
@@ -48,8 +46,10 @@ public class AreaBlockWindow : EditorWindow
         AreaBlock[] areaBlockComponents = m_BlockContainer.GetComponentsInChildren<AreaBlock>();
         foreach(var comp in areaBlockComponents)
         {
-            comp.DestroyCubeHandle();
+            comp.DestroyEditableObj();
         }
+
+        EditorSceneManager.SaveScene(EditorSceneManager.GetActiveScene());
     }
 
     private void Update()
@@ -119,13 +119,15 @@ public class AreaBlockWindow : EditorWindow
         m_AreaBlock = m_CurBlock.AddComponent<AreaBlock>();
         m_AreaBlock.Initialize();
         m_CurSelectedBlockName = m_CurBlock.name;
+
+        m_Creating = true;
     }
 
     void EditAreaBlock()
     {
         if(m_AreaBlock)
         {
-            m_AreaBlock.RebuildCubeHandle();
+            m_AreaBlock.RebuildCubeHandles();
             SelectSphereHandle();
         }
     }
@@ -162,19 +164,52 @@ public class AreaBlockWindow : EditorWindow
     {
         if(m_CurBlock)
         {
-            m_AreaBlock.AddBlockObj(m_SphereHandle.transform.position);
+            m_AreaBlock.AddCubeHandle(m_SphereHandle.transform.position);
+        }
+    }
+
+    void OnKeyDownEvent(Event curEvent)
+    {
+        if (curEvent.isKey && curEvent.keyCode == KeyCode.C)
+        {
+            AddSubBlock();
+        }
+        else if (curEvent.isKey && curEvent.keyCode == KeyCode.K)
+        {
+            if (m_AreaBlock)
+            {
+                m_AreaBlock.DeleteCubeHandle(Selection.activeGameObject);
+            }
+        }
+    }
+
+    void OnLeftMouseDownEvent(Event curEvent)
+    {
+        if (curEvent.button == 0 && m_Creating)
+        {
+            RaycastHit hit;
+            Ray ray = HandleUtility.GUIPointToWorldRay(curEvent.mousePosition);
+            if (Physics.Raycast(ray, out hit, float.MaxValue))
+            {
+                Vector3 point = hit.point;
+                point.y = 0f;
+                m_SphereHandle.transform.position = point;
+            }
+            m_Creating = false;
         }
     }
 
     void OnSceneGUI(SceneView view)
     {
         Event current = Event.current;
-        if(current.type == EventType.KeyDown)
+        switch (current.type)
         {
-            if (current.isKey && current.keyCode == KeyCode.C)
-            {
-                AddSubBlock();
-            }
+            case EventType.KeyDown:
+                OnKeyDownEvent(current);
+                break;
+            case EventType.mouseDown:
+                OnLeftMouseDownEvent(current);
+                break;
         }
 
         if(m_SphereHandle)
