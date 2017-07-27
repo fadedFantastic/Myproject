@@ -1,0 +1,157 @@
+Shader "S_Game_Hero/Hero_Show" 
+{
+	Properties
+	{
+		_MainTex ("Base (RGB)", 2D) = "white" {}
+		_MaskTex ("Mask (R,G,B)", 2D) = "white" {}
+		//_RimColor ("Rim Color",color)=(0.2,0.8,1,1)
+		_RimPower ("Rim Power", Range(1,3.0)) = 1
+		_ReflectionLV ("Reflection Multiplier", Float) = 2.0
+		_LightTex("轮廓光 (RGB)", 2D) = "white" {}
+		_Reflection("反射 (RGB)", 2D) = "white" {}
+		_NormalTex("Normal", 2D) = "bump" {}
+		_NoiseTex ("Noise(RGB)", 2D) = "white" {}
+		_Scroll2X ("Noise speed X", Float) = 1.0
+		_Scroll2Y ("Noise speed Y", Float) = 0.0
+		_Color("Color", Color) = (1,1,1,1)
+		_MMultiplier ("Layer Multiplier", Float) = 2.0
+		_Offset("Height", Float) = 0.8
+		_HeightColor("Height Color", color) = (0.5,0.5,0.5,1)
+		_HeightLightCompensation("Height Light Compensation", Float) = 1
+	}
+	
+	SubShader
+	{
+		Tags { "RenderType"="Opaque" }
+		LOD 200
+		Fog { Mode Off }
+		
+		Pass
+		{
+			CGPROGRAM
+				#pragma vertex vert
+				#pragma fragment frag
+				#pragma multi_compile _DUMMY _REFLECTION_ON
+				#pragma multi_compile _DUMMY _NORMALMAP_ON
+				#pragma multi_compile _DUMMY _NOISETEX_ON
+				#pragma multi_compile _DUMMY _HEIGHT_LIGHT_ON
+			
+				#include "UnityCG.cginc"
+
+				sampler2D _MainTex;
+				sampler2D _LightTex;
+				sampler2D _MaskTex;
+				sampler2D _Reflection;
+				sampler2D _NormalTex;
+				sampler2D _NoiseTex;
+			
+		 		half  _RimPower,_ReflectionLV;
+				half _SGamelGlobalAlphaModifier = 0;
+				
+				half _Scroll2X;
+				half _Scroll2Y;
+				half _MMultiplier;
+				half4 _Color;
+				
+				float4 _MainTex_ST;
+				float4 _NoiseTex_ST;
+
+			    float _Offset;
+			    half4 _HeightColor;
+			    float _HeightLightCompensation;
+
+				struct v2f
+				{
+					float4 pos : SV_POSITION;
+					half4 uv : TEXCOORD0;
+					half3 normal: TEXCOORD1;
+				#if _HEIGHT_LIGHT_ON
+					float4 posWorld : TEXCOORD2;
+					float3 normalWorld : TEXCOORD3;
+				#endif
+				#if _NORMALMAP_ON
+					half3 tangent : TEXCOORD4;
+					half3 binormal : TEXCOORD5;
+				#endif
+				};
+				
+				v2f vert(appdata_full v)
+				{
+					v2f o;
+					o.pos = UnityObjectToClipPos(v.vertex);
+					o.uv.xy = TRANSFORM_TEX(v.texcoord.xy, _MainTex);
+				#if _NOISETEX_ON
+					o.uv.zw = TRANSFORM_TEX(v.texcoord.xy, _NoiseTex) + frac(float2(_Scroll2X, _Scroll2Y) * _Time.x);
+				#else
+					o.uv.zw = o.uv.xy;
+				#endif
+					o.normal = mul(UNITY_MATRIX_MV, float4(v.normal,0)).xyz;
+				#if _HEIGHT_LIGHT_ON 
+					o.posWorld = mul(unity_ObjectToWorld, v.vertex);
+					o.normalWorld = mul(unity_ObjectToWorld, float4(v.normal, 0)).xyz;
+				#endif
+				#if _NORMALMAP_ON
+					o.tangent = mul(UNITY_MATRIX_MV, float4(v.tangent.xyz, 0)).xyz;
+					o.binormal = cross(o.normal, o.tangent) * v.tangent.w;
+				#endif
+					
+					return o;
+				}
+				
+				fixed4 frag (v2f i) : COLOR
+				{
+				#if _NORMALMAP_ON
+					half3x3 basis = half3x3(i.tangent, i.binormal, i.normal);
+					half3 normal = tex2D(_NormalTex, i.uv.xy).rgb * 2 - 1;
+					half3 normalVS = normalize(mul(normal, basis));
+				#else
+					half3 normalVS = normalize(i.normal);
+				#endif
+					
+					half2 uv = normalVS.xy * 0.5 + 0.5;
+					fixed4 Light = tex2D(_LightTex,uv) * 2;	
+					fixed4 Tex1 = tex2D(_MainTex, i.uv.xy);
+					fixed3 color = Tex1.rgb * Light.rgb;
+					
+				#if _REFLECTION_ON || _NOISETEX_ON
+					fixed4 Mask = tex2D(_MaskTex, i.uv.xy);
+				#endif
+				
+				#if _REFLECTION_ON
+					half3 Reflection = tex2D(_Reflection,uv).rgb;
+					//color += Mask.r * pow(Reflection, _RimPower);
+					color=  lerp ( color ,color * pow(Reflection, _RimPower)*_ReflectionLV,  Mask.r  ) ;
+				#endif
+				
+				#if _NOISETEX_ON
+					fixed3 noise = tex2D (_NoiseTex, i.uv.zw 
+
+).rgb;
+					noise *= Tex1.rgb * _Color.rgb;
+					noise *= Mask.g * _MMultiplier;
+					/ise *= _MMultiplier;
+					color += noise;
+				#endif
+
+				#if _HEIGHT_LIGHT_ON 
+					i.normalWorld = normalize(i.normalWorld);
+					float4 rootPos = mul(unity_ObjectToWorld, float4(0, 0, 0, 1));
+					float3 node_A = i.posWorld.g- (rootPos.g - _Offset); 
+					float3 node_B = i.normalWorld.g * 0.5;
+					float3 node_C = node_A + node_B;
+				
+					color = saturate(color * lerp(_HeightColor.rgb, float3(1, 1, 1), clamp(node_C, 0, 1)) * _HeightLightCompensation);
+					
+				#endif
+
+				
+					fixed alpha = Tex1.a;
+					return fixed4(color, alpha);
+				}
+			
+			ENDCG
+		}
+	} 
+	
+	CustomEditor "SGameHeroShowMaterialEditor"
+}
