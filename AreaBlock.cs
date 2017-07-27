@@ -1,31 +1,28 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEditor;
 
 public class AreaBlock : MonoBehaviour
 {
     private static int m_InstanceID = 0;
 
     [SerializeField] private List<GameObject> m_Blocks = new List<GameObject>();
-    public List<GameObject> Blocks { get { return m_Blocks; } }
-
     [SerializeField] private List<Vector3> m_BlockVertices = new List<Vector3>();
     public List<Vector3> BlockVertices { get { return m_BlockVertices; } }
 
     private GameObject m_EditObj;
     private Vector3 m_GizmosSize = Vector3.one;
-    private bool m_Editing = true;
+    [SerializeField][HideInInspector] private bool m_Editing = true;
 
     public void Initialize()
     {
         ++m_InstanceID;
         gameObject.name = "Block" + m_InstanceID.ToString();
-        m_EditObj = new GameObject("edit");
+        m_EditObj = new GameObject("Edit");
         m_EditObj.transform.parent = gameObject.transform;
     }
 
-    public void AddBlockObj(Vector3 pos)
+    public void AddCubeHandle(Vector3 pos)
     {
         int count = m_Blocks.Count;
         if(count > 0)
@@ -37,6 +34,15 @@ public class AreaBlock : MonoBehaviour
         }
 
         InstantiateCubeHandle(pos);
+    }
+
+    public void DeleteCubeHandle(GameObject go)
+    {
+        if(go.name == "Cube")
+        {
+            m_Blocks.Remove(go);
+            DestroyImmediate(go);
+        }
     }
 
     /// <summary>
@@ -59,7 +65,7 @@ public class AreaBlock : MonoBehaviour
     /// <summary>
     /// 重建白色立方体，允许编辑阻挡区域
     /// </summary>
-    public void RebuildCubeHandle()
+    public void RebuildCubeHandles()
     {
         if (m_EditObj) return;
 
@@ -92,7 +98,10 @@ public class AreaBlock : MonoBehaviour
         }
     }
 
-    public void DestroyCubeHandle()
+    /// <summary>
+    /// 销毁可编辑物体
+    /// </summary>
+    public void DestroyEditableObj()
     {
         m_Editing = false;
         m_Blocks.Clear();
